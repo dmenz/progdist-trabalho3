@@ -1,0 +1,61 @@
+
+*************************
+Processo de Nó Servidor:
+*************************
+
+Recebe por argv o seu número e calcula os IDs e portas dos nós vizinhos e popula a FingerTable
+
+-Fingertable imutável global
+    
+-Thread Gerente do Hashmap:
+    Owner da hashmap.
+    Espera em um canal por pedidos de acesso à hashmap vindo de outras threads.
+    Recebe mensagem das threads de requisições contendo o comando (inserção ou consulta) os valores do comando, e um canal para resposta.
+    Caso não haja valor inserido em um campo buscado, guarda o canal de resposta em uma fila.
+    Ao inserir um novo valor, notifica as threads que possuem canais na fila e os remove da fila.
+
+-Thread gerente de conexões:
+    A cada nova conexão, cria uma nova thread para atender à requisição do cliente.
+    Copia a ponta Sender do canal com a thread gerente do Hashmap para a thread atendente.
+
+-Threads atendentes:
+    Criadas sob demanda pela thread gerente de conexões
+    Recebe a requisição do cliente ou de outro nó
+    Realiza o hash da chave para verificar se este é o nó responsável pela chave
+    Se não for o nó responsável pela chave, roteia para o nó vizinho mais próximo do nó responsável
+    Se for, 
+        Cria um canal, e envia uma mensagem para a thread do hashmap
+        Espera uma resposta pelo canal
+        Responde o cliente via nova conexão TCP
+
+
+
+*****************
+Processo Cliente:
+*****************
+	Utiliza a biblioteca criada hashmap para:
+    Criar um TcpListener para receber respostas do servidor antes de uma requisição, caso seja uma consulta
+    Enviar uma requisição
+    Esperar a resposta do servidor, caso seja uma consulta
+
+
+
+
+****************************
+Comunicação Cliente-Servidor
+****************************
+
+	Requisições de um cliente para um nó servidor são da forma "<ip_de_resposta>;<id_consulta>;<operação>;<chave>;<valor>"
+	Quando a operação é 'i' (inserção), o ip de resposta é ignorado, e quando a operação é 'c' (consulta) o campo valor é ignorado
+	Um nó servidor, ao rotear, apenas envia a mesma mensagem para o nó mais próximo do destino em sua finger table
+	Um nó servidor responsável pela chave solicitada, em uma operação de consulta, envia uma mensagem ao cliente pelo ip informado da forma "<valor>;<id_nó>", informando ao cliente o valor encontrado na tabela hash e o seu próprio id
+
+
+
+******
+Testes
+******
+
+	O arquivo run_test.sh executa testes com 16 e 32 nós verificando algumas inserções e consultas em diferentes nós
+	Também é testeado o caso de uma consulta ser realizada antes da inserção da sua chave, através de um sleep
+	Os resultados são verificáveis pelas saídas dos servidores e dos clientes que informam os seus eventos
